@@ -70,7 +70,6 @@ public final class CalculatorClient {
             buttonDragging = true; buttonMoved = false;
             buttonPressX = mx; buttonPressY = my;
             buttonDragOffsetX = mx - buttonX; buttonDragOffsetY = my - buttonY;
-            event.setCanceled(true);
             return;
         }
         if (!open) return;
