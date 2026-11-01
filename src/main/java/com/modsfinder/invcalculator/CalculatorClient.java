@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.event.ScreenEvent;
 
 @EventBusSubscriber(modid = InventoryCalculator.MOD_ID, value = Dist.CLIENT)
 public final class CalculatorClient {
-    private static final int PANEL_W = 150, PANEL_H = 184, BUTTON_SIZE = 18;
+    private static final int PANEL_W = 150, PANEL_H = 202, BUTTON_SIZE = 18;
     private static boolean open, dragging;
     private static int panelX = -1, panelY = -1, dragOffsetX, dragOffsetY;
     private static String expression = "", result = "0", status = "";
@@ -55,13 +55,13 @@ public final class CalculatorClient {
             g.fill(kx, ky, kx + 31, ky + 19, KEYS[i].equals("=") ? 0xFF356C43 : 0xFF555555);
             g.centeredText(font, KEYS[i], kx + 15, ky + 5, 0xFFFFFFFF);
         }
-        g.text(font, "Copy result", x + 8, y + 174, 0xFFB9D9FF);
+        g.text(font, "Copy result", x + 8, y + 188, 0xFFB9D9FF);
     }
 
     @SubscribeEvent
     public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre event) {
         if (!(event.getScreen() instanceof InventoryScreen screen) || event.getButton() != 0) return;
-        int mx = event.getMouseX(), my = event.getMouseY();
+        int mx = (int) Math.floor(event.getMouseX()), my = (int) Math.floor(event.getMouseY());
         int left = (screen.width - 176) / 2, top = (screen.height - 166) / 2;
         int bx = left + 181, by = top + 8;
         if (inside(mx, my, bx, by, BUTTON_SIZE, BUTTON_SIZE)) {
@@ -79,7 +79,7 @@ public final class CalculatorClient {
         if (inside(mx, my, x, y, PANEL_W, 19)) {
             dragging = true; dragOffsetX = mx - panelX; dragOffsetY = my - panelY; return;
         }
-        if (inside(mx, my, x + 6, y + 170, 90, 14)) { copyResult(); return; }
+        if (inside(mx, my, x + 6, y + 184, 90, 14)) { copyResult(); return; }
         int gx = mx - (x + 6), gy = my - (y + 63);
         if (gx < 0 || gy < 0) return;
         int col = gx / 35, row = gy / 23;
@@ -91,8 +91,8 @@ public final class CalculatorClient {
     public static void onMouseDragged(ScreenEvent.MouseDragged.Pre event) {
         if (!(event.getScreen() instanceof InventoryScreen screen) || !dragging) return;
         ensurePosition(screen);
-        panelX = clamp(event.getMouseX() - dragOffsetX, 0, Math.max(0, screen.width - PANEL_W));
-        panelY = clamp(event.getMouseY() - dragOffsetY, 0, Math.max(0, screen.height - PANEL_H));
+        panelX = clamp((int) Math.round(event.getMouseX() - dragOffsetX), 0, Math.max(0, screen.width - PANEL_W));
+        panelY = clamp((int) Math.round(event.getMouseY() - dragOffsetY), 0, Math.max(0, screen.height - PANEL_H));
         event.setCanceled(true);
     }
 
