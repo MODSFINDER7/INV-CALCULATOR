@@ -145,7 +145,7 @@ public final class CalculatorClient {
     }
     private static String format(double value) {
         if (value == Math.rint(value) && Math.abs(value) < 1.0e15) return Long.toString((long) value);
-        return String.format(java.util.Locale.ROOT, "%.10f", value).replaceAll("0+$", "").replaceAll("\\\\.$", "");
+        return String.format(java.util.Locale.ROOT, "%.10f", value).replaceAll("0+$", "").replaceAll("\\.$", "");
     }
     private static void copyResult() { Minecraft.getInstance().keyboardHandler.setClipboard(result); }
     private static void ensurePosition(Screen screen) {
