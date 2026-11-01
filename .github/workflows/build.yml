@@ -1,14 +1,29 @@
 name: Build Inventory Calculator
+
 on:
   push:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - minecraft: '26.1.2'
+            neoforge: '26.1.2.124'
+            minecraft_range: '[26.1,26.2)'
+            artifact: 'Inventory-Calculator-NeoForge-26.1.2'
+          - minecraft: '26.2'
+            neoforge: '26.2.0.90'
+            minecraft_range: '[26.2,26.3)'
+            artifact: 'Inventory-Calculator-NeoForge-26.2'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -19,9 +34,13 @@ jobs:
         with:
           gradle-version: '9.2.1'
       - name: Build mod
-        run: gradle build --no-daemon
+        run: >-
+          gradle build --no-daemon
+          -Pminecraft_version=${{ matrix.minecraft }}
+          -Pneo_version=${{ matrix.neoforge }}
+          -Pminecraft_version_range='${{ matrix.minecraft_range }}'
       - uses: actions/upload-artifact@v4
         with:
-          name: Inventory-Calculator-NeoForge-26.2
+          name: ${{ matrix.artifact }}
           path: build/libs/*.jar
           if-no-files-found: error
