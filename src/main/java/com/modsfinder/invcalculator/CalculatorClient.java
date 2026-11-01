@@ -19,8 +19,8 @@ import net.neoforged.neoforge.client.event.ScreenEvent;
 @EventBusSubscriber(modid = InventoryCalculator.MOD_ID, value = Dist.CLIENT)
 public final class CalculatorClient {
     private static final int PANEL_W = 150, PANEL_H = 202, BUTTON_SIZE = 18;
-    private static boolean open, dragging;
-    private static int panelX = -1, panelY = -1, dragOffsetX, dragOffsetY;
+    private static boolean open, dragging, buttonDragging, buttonMoved;
+    private static int panelX = -1, panelY = -1, buttonX = -1, buttonY = -1, dragOffsetX, dragOffsetY, buttonDragOffsetX, buttonDragOffsetY, buttonPressX, buttonPressY;
     private static String expression = "", result = "0", status = "";
     private static final String[] KEYS = {"7","8","9","÷","4","5","6","×","1","2","3","−","0",".","(",")","AC","⌫","=","+"};
     private CalculatorClient() {}
@@ -31,7 +31,8 @@ public final class CalculatorClient {
         GuiGraphicsExtractor g = event.getGuiGraphics();
         Font font = Minecraft.getInstance().font;
         int left = (screen.width - 176) / 2, top = (screen.height - 166) / 2;
-        int bx = left + 181, by = top + 8;
+        ensureButtonPosition(screen);
+        int bx = buttonX, by = buttonY;
         g.fill(bx, by, bx + BUTTON_SIZE, by + BUTTON_SIZE, 0xFF303030);
         g.fill(bx + 1, by + 1, bx + BUTTON_SIZE - 1, by + BUTTON_SIZE - 1, 0xFF565656);
         g.centeredText(font, "÷", bx + BUTTON_SIZE / 2, by + 5, 0xFFFFFFFF);
@@ -64,10 +65,11 @@ public final class CalculatorClient {
         if (!(event.getScreen() instanceof InventoryScreen screen) || event.getButton() != 0) return;
         int mx = (int) Math.floor(event.getMouseX()), my = (int) Math.floor(event.getMouseY());
         int left = (screen.width - 176) / 2, top = (screen.height - 166) / 2;
-        int bx = left + 181, by = top + 8;
-        if (inside(mx, my, bx, by, BUTTON_SIZE, BUTTON_SIZE)) {
-            open = !open; dragging = false;
-            if (open) ensurePosition(screen);
+        ensureButtonPosition(screen);
+        if (inside(mx, my, buttonX, buttonY, BUTTON_SIZE, BUTTON_SIZE)) {
+            buttonDragging = true; buttonMoved = false;
+            buttonPressX = mx; buttonPressY = my;
+            buttonDragOffsetX = mx - buttonX; buttonDragOffsetY = my - buttonY;
             event.setCanceled(true);
             return;
         }
@@ -90,7 +92,16 @@ public final class CalculatorClient {
 
     @SubscribeEvent
     public static void onMouseDragged(ScreenEvent.MouseDragged.Pre event) {
-        if (!(event.getScreen() instanceof InventoryScreen screen) || !dragging) return;
+        if (!(event.getScreen() instanceof InventoryScreen screen)) return;
+        if (buttonDragging) {
+            int nextX = clamp((int) Math.round(event.getMouseX() - buttonDragOffsetX), 0, Math.max(0, screen.width - BUTTON_SIZE));
+            int nextY = clamp((int) Math.round(event.getMouseY() - buttonDragOffsetY), 0, Math.max(0, screen.height - BUTTON_SIZE));
+            if (Math.abs(nextX - buttonX) + Math.abs(nextY - buttonY) > 2) buttonMoved = true;
+            buttonX = nextX; buttonY = nextY;
+            event.setCanceled(true);
+            return;
+        }
+        if (!dragging) return;
         ensurePosition(screen);
         panelX = clamp((int) Math.round(event.getMouseX() - dragOffsetX), 0, Math.max(0, screen.width - PANEL_W));
         panelY = clamp((int) Math.round(event.getMouseY() - dragOffsetY), 0, Math.max(0, screen.height - PANEL_H));
@@ -99,7 +110,16 @@ public final class CalculatorClient {
 
     @SubscribeEvent
     public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre event) {
-        if (event.getScreen() instanceof InventoryScreen && dragging) { dragging = false; save(); }
+        if (!(event.getScreen() instanceof InventoryScreen screen) || event.getButton() != 0) return;
+        if (buttonDragging) {
+            buttonDragging = false;
+            if (!buttonMoved) {
+                open = !open; dragging = false;
+                if (open) ensurePosition(screen);
+            }
+            save(); event.setCanceled(true); return;
+        }
+        if (dragging) { dragging = false; save(); }
     }
 
     @SubscribeEvent
@@ -149,6 +169,16 @@ public final class CalculatorClient {
         return String.format(java.util.Locale.ROOT, "%.10f", value).replaceAll("0+$", "").replaceAll("\\.$", "");
     }
     private static void copyResult() { Minecraft.getInstance().keyboardHandler.setClipboard(result); }
+    private static void ensureButtonPosition(Screen screen) {
+        if (buttonX < 0 || buttonY < 0) {
+            int left = (screen.width - 176) / 2, top = (screen.height - 166) / 2;
+            buttonX = clamp(left + 181, 0, Math.max(0, screen.width - BUTTON_SIZE));
+            buttonY = clamp(top + 8, 0, Math.max(0, screen.height - BUTTON_SIZE));
+            load();
+        }
+        buttonX = clamp(buttonX, 0, Math.max(0, screen.width - BUTTON_SIZE));
+        buttonY = clamp(buttonY, 0, Math.max(0, screen.height - BUTTON_SIZE));
+    }
     private static void ensurePosition(Screen screen) {
         if (panelX < 0 || panelY < 0) {
             panelX = clamp((screen.width - PANEL_W) / 2 + 92, 0, Math.max(0, screen.width - PANEL_W));
@@ -169,6 +199,7 @@ public final class CalculatorClient {
             Properties p = new Properties();
             p.setProperty("expression", expression); p.setProperty("result", result);
             p.setProperty("x", Integer.toString(panelX)); p.setProperty("y", Integer.toString(panelY));
+            p.setProperty("buttonX", Integer.toString(buttonX)); p.setProperty("buttonY", Integer.toString(buttonY));
             try (var writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) { p.store(writer, "Inventory Calculator"); }
         } catch (IOException ignored) {}
     }
@@ -180,6 +211,8 @@ public final class CalculatorClient {
             p.load(reader); expression = p.getProperty("expression", expression); result = p.getProperty("result", result);
             panelX = Integer.parseInt(p.getProperty("x", Integer.toString(panelX)));
             panelY = Integer.parseInt(p.getProperty("y", Integer.toString(panelY)));
+            buttonX = Integer.parseInt(p.getProperty("buttonX", Integer.toString(buttonX)));
+            buttonY = Integer.parseInt(p.getProperty("buttonY", Integer.toString(buttonY)));
             panelX = clamp(panelX, 0, Math.max(0, Minecraft.getInstance().getWindow().getGuiScaledWidth() - PANEL_W));
             panelY = clamp(panelY, 0, Math.max(0, Minecraft.getInstance().getWindow().getGuiScaledHeight() - PANEL_H));
         } catch (IOException | NumberFormatException ignored) {}
